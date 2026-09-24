@@ -1,0 +1,11 @@
+{
+  "name": "campus-radar-workspace",
+  "version": "1.0.0",
+  "description": "Campus Radar - Full-stack Collegiate Digital Community",
+  "scripts": {
+    "server": "cd server && npm start",
+    "client": "cd client && npm run dev",
+    "build:client": "cd client && npm run build"
+  },
+  "keywords": ["campus", "radar", "social", "confessions", "events", "academics"]
+}

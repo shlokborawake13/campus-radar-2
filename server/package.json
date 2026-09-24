@@ -1,0 +1,25 @@
+{
+  "name": "campus-radar-server",
+  "version": "1.0.0",
+  "description": "Express API server for Campus Radar collegiate platform",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.1",
+    "@textbee/sdk": "^0.2.0",
+    "compression": "^1.8.2",
+    "cors": "^2.8.5",
+    "dotenv": "^18.0.3",
+    "express": "^4.21.2",
+    "helmet": "^8.3.0",
+    "multer": "^2.4.0",
+    "pg": "^8.23.0",
+    "resend": "^6.28.1",
+    "sharp": "^0.35.4",
+    "twilio": "^6.1.1"
+  }
+}
