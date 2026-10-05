@@ -13,8 +13,10 @@ import NotificationsView from './views/NotificationsView';
 import ProfileView from './views/ProfileView';
 import SettingsView from './views/SettingsView';
 import AuthView from './views/AuthView';
+import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import { apiService } from './services/api';
 import { analytics } from './utils/analyticsTracker';
+import { AlertCircle } from 'lucide-react';
 
 // Code splitting / lazy loading AdminView for optimal student bundle performance
 const AdminView = React.lazy(() => import('./views/AdminView'));
@@ -27,7 +29,7 @@ export default function App() {
   
   // Authentication & Session
   const [isAuthenticated, setIsAuthenticated] = useState(!!apiService.getToken());
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isAuthChecking, setIsAuthChecking] = useState(!!apiService.getToken());
 
   // Data state
   const [posts, setPosts] = useState([]);
@@ -43,46 +45,74 @@ export default function App() {
   const [editingPost, setEditingPost] = useState(null);
   const [reportingTarget, setReportingTarget] = useState(null);
 
-  // URL Hash Synchronizer
+  // URL Hash & Pathname Synchronizer (Strict Role-Aware Route Guard)
   const syncHashToState = useCallback(() => {
-    const hash = window.location.hash.replace('#', '') || '/radar';
-    if (hash.startsWith('/profile/')) {
-      const targetId = hash.replace('/profile/', '');
+    const rawPath = window.location.pathname;
+    const rawHash = (window.location.hash || '').replace(/^#\/?/, '/');
+    const route = rawHash || (rawPath !== '/' ? rawPath : '/radar');
+
+    // Strict Admin Protection:
+    // If route is /admin or /admin/*, verify authoritative admin role
+    if (route === '/admin' || route.startsWith('/admin/')) {
+      const isStaff = ['admin', 'super_admin'].includes(userProfile?.role?.toLowerCase());
+      if (isAuthChecking) {
+        // While auth checking is in progress, stay on neutral tab without mounting admin view
+        return;
+      }
+      if (!isStaff) {
+        // Normal students or unauthenticated users attempting /admin get redirected to generic 404
+        setCurrentTab('not-found');
+        return;
+      }
+      setCurrentTab('admin');
+      return;
+    }
+
+    if (route.startsWith('/profile/')) {
+      const targetId = route.replace('/profile/', '');
       setViewingProfileId(targetId);
       setCurrentTab('profile');
-    } else if (hash === '/explore') {
+    } else if (route === '/explore') {
       setCurrentTab('explore');
-    } else if (hash === '/trending') {
+    } else if (route === '/trending') {
       setCurrentTab('feed');
       setActiveCategory('Trending');
-    } else if (hash === '/confessions') {
+    } else if (route === '/confessions') {
       setCurrentTab('feed');
       setActiveCategory('Confessions');
-    } else if (hash === '/events') {
+    } else if (route === '/events') {
       setCurrentTab('feed');
       setActiveCategory('Events');
-    } else if (hash === '/saved') {
+    } else if (route === '/saved') {
       setCurrentTab('saved');
-    } else if (hash === '/alerts') {
+    } else if (route === '/alerts') {
       setCurrentTab('notifications');
-    } else if (hash === '/settings') {
+    } else if (route === '/settings') {
       setCurrentTab('settings');
-    } else if (hash === '/admin') {
-      setCurrentTab('admin');
-    } else if (hash === '/profile') {
+    } else if (route === '/profile') {
       setViewingProfileId(null);
       setCurrentTab('profile');
     } else {
       setCurrentTab('feed');
       setActiveCategory('All');
     }
-  }, []);
+  }, [userProfile, isAuthChecking]);
 
   useEffect(() => {
     syncHashToState();
     window.addEventListener('popstate', syncHashToState);
     return () => window.removeEventListener('popstate', syncHashToState);
   }, [syncHashToState]);
+
+  // Extra defense-in-depth: If non-admin user ever has currentTab === 'admin', force-evict to not-found
+  useEffect(() => {
+    if (!isAuthChecking) {
+      const isStaff = ['admin', 'super_admin'].includes(userProfile?.role?.toLowerCase());
+      if (currentTab === 'admin' && !isStaff) {
+        setCurrentTab('not-found');
+      }
+    }
+  }, [currentTab, userProfile, isAuthChecking]);
 
   // Initialize privacy-preserving client analytics and active duration tracker
   useEffect(() => {
@@ -128,7 +158,11 @@ export default function App() {
     else if (tab === 'notifications') window.location.hash = '/alerts';
     else if (tab === 'saved') window.location.hash = '/saved';
     else if (tab === 'settings') window.location.hash = '/settings';
-    else if (tab === 'admin') window.location.hash = '/admin';
+    else if (tab === 'admin') {
+      const isStaff = ['admin', 'super_admin'].includes(userProfile?.role?.toLowerCase());
+      if (!isStaff) return;
+      window.location.hash = '/admin';
+    }
     else if (tab === 'profile') {
       setViewingProfileId(null);
       window.location.hash = '/profile';
@@ -204,6 +238,9 @@ export default function App() {
           { tag: '#Robotics', count: '420 posts', category: 'Clubs' },
           { tag: '#Confession', count: '310 posts', category: 'Confessions' }
         ]);
+      } else {
+        setIsAuthenticated(false);
+        setUserProfile(null);
       }
     } catch (e) {
       console.warn('Initial session validation error:', e);
@@ -379,16 +416,11 @@ export default function App() {
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
-  // Render AuthView if not authenticated or loading initial auth
+  // Simple, clean refresh loader on app background while validating session
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen bg-slate-bg flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center animate-bounce">
-            <span className="text-xl font-bold">R</span>
-          </div>
-          <p className="text-[13px] font-semibold text-slate-meta">Initializing Campus Radar...</p>
-        </div>
+      <div className="min-h-screen bg-[#faf8ff] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-emerald-500/20 border-t-emerald-600 animate-spin" />
       </div>
     );
   }
@@ -553,9 +585,37 @@ export default function App() {
           )}
 
           {currentTab === 'admin' && (
-            <React.Suspense fallback={<div className="p-12 text-center text-slate-400 font-mono text-sm animate-pulse">Loading Campus Radar Console...</div>}>
-              <AdminView currentUser={userProfile} />
-            </React.Suspense>
+            <ProtectedAdminRoute
+              currentUser={userProfile}
+              isAuthenticated={isAuthenticated}
+              isAuthChecking={isAuthChecking}
+              onRedirectHome={() => handleSelectTab('feed')}
+            >
+              <React.Suspense fallback={<div className="p-12 text-center text-slate-400 font-mono text-sm animate-pulse">Loading Campus Radar Console...</div>}>
+                <AdminView currentUser={userProfile} />
+              </React.Suspense>
+            </ProtectedAdminRoute>
+          )}
+
+          {currentTab === 'not-found' && (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] w-full px-4 py-12">
+              <div className="text-center py-16 px-6 bg-white rounded-3xl border border-slate-border max-w-md w-full shadow-soft-card">
+                <div className="w-14 h-14 bg-slate-50 border border-slate-200/60 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-400">
+                  <AlertCircle className="w-7 h-7 stroke-[1.75]" />
+                </div>
+                <h1 className="text-2xl font-black text-slate-headline mb-2 tracking-tight">404</h1>
+                <h2 className="text-sm font-bold text-slate-headline mb-1">Page Not Found</h2>
+                <p className="text-xs text-slate-meta max-w-xs mx-auto mb-6 leading-relaxed">
+                  The page you are looking for does not exist, has been removed, or is temporarily unavailable.
+                </p>
+                <button
+                  onClick={() => handleSelectTab('feed')}
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition duration-150 shadow-sm cursor-pointer"
+                >
+                  <span>Return to Feed</span>
+                </button>
+              </div>
+            </div>
           )}
         </main>
 

@@ -10,7 +10,8 @@ import {
   User,
   Settings,
   Plus,
-  ShieldCheck
+  ShieldCheck,
+  Radio
 } from 'lucide-react';
 
 export default function LeftSidebar({
@@ -203,6 +204,19 @@ export default function LeftSidebar({
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>Create Post</span>
           </button>
+        </div>
+
+        {/* Brand Badge */}
+        <div className="pt-4 px-0.5">
+          <div className="p-2.5 rounded-2xl bg-white border border-slate-border/80 shadow-soft-card flex items-center gap-2.5 hover:border-slate-border transition">
+            <div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+              <Radio className="w-4 h-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[12px] font-bold text-slate-headline truncate">Campus Radar</p>
+              <p className="text-[10px] font-semibold text-emerald-600 truncate">Sanjivani Network</p>
+            </div>
+          </div>
         </div>
       </div>
     </aside>

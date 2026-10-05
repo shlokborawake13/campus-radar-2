@@ -36,3 +36,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Root media files
+/loading.mp4
+/logo.png
+

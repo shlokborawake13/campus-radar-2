@@ -12,7 +12,8 @@ import {
   Eye,
   EyeOff,
   Sparkles,
-  ChevronLeft
+  ChevronLeft,
+  Radio
 } from 'lucide-react';
 import LegalModal from '../components/LegalModal';
 import { apiService } from '../services/api';
@@ -373,13 +374,15 @@ export default function AuthView({ onAuthenticated }) {
     <div className="min-h-screen bg-slate-bg flex flex-col justify-center items-center px-4 py-8 select-none">
       {/* Container Card */}
       <div className="w-full max-w-[440px] bg-white rounded-3xl border border-slate-border shadow-soft-card p-6 sm:p-8 relative overflow-hidden transition-all duration-300">
-        {/* Subtle Decorative Campus Radar Header */}
+        {/* Official Campus Radar Header */}
         <div className="flex flex-col items-center text-center mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary to-emerald-400 flex items-center justify-center text-white shadow-emerald-fab mb-3 ring-4 ring-emerald-50">
-            <Shield className="w-6 h-6 stroke-[2.5]" />
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shadow-sm mb-3">
+            <Radio className="w-7 h-7 text-primary stroke-[2.2]" />
           </div>
-          <h1 className="text-[22px] font-black text-slate-headline tracking-tight">Campus Radar</h1>
-          <p className="text-[12px] font-semibold text-primary tracking-wide uppercase mt-0.5">
+          <h1 className="text-2xl font-black text-slate-headline tracking-tight">
+            <span className="text-primary font-black">Campus</span>&nbsp;Radar
+          </h1>
+          <p className="text-[11.5px] font-bold text-primary tracking-wide uppercase mt-1">
             Sanjivani University Collegiate Network
           </p>
         </div>

@@ -4,14 +4,16 @@ const { query, withTransaction } = require('../db');
 const { requireAdmin, logAdminAction } = require('../middleware/adminAuth');
 const { revokeUserSessions } = require('../security');
 const { formatTimeAgo } = require('../middleware/privacy');
+const { adminLimiter } = require('../middleware/rateLimit');
 
-// Apply admin authentication to all routes in this router
+// Apply admin rate limiting and admin authorization to all routes in this router
+router.use(adminLimiter);
 router.use(requireAdmin());
 
 // ============================================================================
 // 1. DASHBOARD OVERVIEW & AGGREGATE METRICS
 // ============================================================================
-router.get('/overview', requireAdmin('dashboard.read'), async (req, res) => {
+router.get(['/overview', '/dashboard'], requireAdmin('dashboard.read'), async (req, res) => {
   try {
     const { timeRange = '7d' } = req.query;
 
@@ -394,6 +396,64 @@ router.patch('/users/:id', requireAdmin('users.update'), async (req, res) => {
   } catch (err) {
     console.error('[Admin Update User Error]:', err);
     res.status(500).json({ success: false, message: 'Failed to update student account' });
+  }
+});
+
+// Dedicated Role Management Endpoint (Server-Side Authoritative & Audited)
+router.patch('/users/:id/role', requireAdmin('users.update'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!role || !['student', 'admin', 'moderator', 'super_admin'].includes(role)) {
+      return res.status(400).json({ success: false, message: 'Valid role is required (student, admin, moderator, super_admin).' });
+    }
+
+    const actorRole = (req.authoritativeRole || req.user.role || '').toLowerCase();
+    if (actorRole !== 'admin' && actorRole !== 'super_admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden: Insufficient privileges to alter user roles.' });
+    }
+
+    // Prevent changing own role (separation of duties)
+    if (id === req.user.id) {
+      return res.status(400).json({ success: false, message: 'Self-role modification is strictly prevented.' });
+    }
+
+    const userRes = await query('SELECT id, role, email FROM users WHERE id = $1', [id]);
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+    const targetUser = userRes.rows[0];
+
+    // Update authoritative user_roles table
+    await query(`
+      INSERT INTO user_roles (user_id, role, updated_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, updated_at = NOW()
+    `, [id, role]);
+
+    // Update users table for consistency
+    await query('UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2', [role, id]);
+
+    // Revoke sessions of the user to force immediate re-authentication with new privileges
+    revokeUserSessions(id);
+
+    // Audit log
+    await logAdminAction({
+      actorId: req.user.id,
+      adminRole: actorRole,
+      action: 'USER_ROLE_CHANGED',
+      targetType: 'user',
+      targetId: id,
+      metadata: { targetEmail: targetUser.email, oldRole: targetUser.role, newRole: role },
+      req,
+      status: 'SUCCESS'
+    });
+
+    res.json({ success: true, message: `User role successfully updated to ${role}.`, role });
+  } catch (err) {
+    console.error('[Admin Change Role Error]:', err);
+    res.status(500).json({ success: false, message: 'Failed to update user role.' });
   }
 });
 
@@ -1362,7 +1422,7 @@ router.get('/audit', requireAdmin('audit.read'), async (req, res) => {
 // 9. USER BEHAVIOR ANALYTICS & TIME SPENT ENGINE
 // ============================================================================
 
-router.get('/analytics/overview', requireAdmin('analytics.read'), async (req, res) => {
+router.get(['/analytics', '/analytics/overview'], requireAdmin('analytics.read'), async (req, res) => {
   try {
     const { timeRange = '7d' } = req.query;
 

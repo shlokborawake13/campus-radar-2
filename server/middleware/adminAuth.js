@@ -78,41 +78,77 @@ function hasPermission(role, requiredPermission) {
 }
 
 /**
- * Enforce Admin Authorization with Zero Information Leakage:
- * - Unauthenticated users get 401
- * - Normal students get 404 (pretend the admin route does not exist)
- * - Unauthorized admins (lacking specific permission) get 403
+ * Enforce Admin Authorization (Centralized Server-Side RBAC Middleware):
+ * - Unauthenticated users receive HTTP 401
+ * - Normal students (or any non-admin) receive HTTP 403 Forbidden
+ * - Direct query to authoritative server-side user_roles table
+ * - Never returns admin data or executes operations for unauthorized callers
+ * - Immutable security failure logging
  */
 function requireAdmin(requiredPermission) {
-  return (req, res, next) => {
-    // 1. Verify authentication
-    if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Authentication required. Please sign in with institutional credentials.'
-      });
+  return async (req, res, next) => {
+    try {
+      // 1. Verify authentication
+      if (!req.user || !req.user.id) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required. Please sign in with institutional credentials.'
+        });
+      }
+
+      // 2. Query authoritative server-side user_roles table for this exact user ID
+      const roleRes = await query(
+        'SELECT role FROM user_roles WHERE user_id = $1',
+        [req.user.id]
+      );
+
+      const authoritativeRole = (roleRes.rows[0]?.role || req.user.role || '').toLowerCase();
+      const adminRoles = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MODERATOR];
+
+      // 3. Reject non-admin students with HTTP 403 Forbidden
+      if (!adminRoles.includes(authoritativeRole)) {
+        await logAdminAction({
+          actorId: req.user.id,
+          adminRole: authoritativeRole,
+          action: 'UNAUTHORIZED_ADMIN_ACCESS_ATTEMPT',
+          targetType: 'admin_route',
+          targetId: null,
+          metadata: { path: req.originalUrl, method: req.method, attemptedRole: authoritativeRole },
+          req,
+          status: 'FORBIDDEN'
+        }).catch(() => {});
+
+        return res.status(403).json({
+          success: false,
+          message: 'Forbidden: Insufficient administrative privileges.'
+        });
+      }
+
+      // 4. Granular permission check
+      if (requiredPermission && !hasPermission(authoritativeRole, requiredPermission)) {
+        await logAdminAction({
+          actorId: req.user.id,
+          adminRole: authoritativeRole,
+          action: 'FORBIDDEN_PERMISSION_LACKING',
+          targetType: 'permission',
+          targetId: null,
+          metadata: { path: req.originalUrl, requiredPermission, role: authoritativeRole },
+          req,
+          status: 'FORBIDDEN'
+        }).catch(() => {});
+
+        return res.status(403).json({
+          success: false,
+          message: `Forbidden: Lacks required permission '${requiredPermission}'.`
+        });
+      }
+
+      req.authoritativeRole = authoritativeRole;
+      next();
+    } catch (err) {
+      console.error('[requireAdmin Middleware Error]:', err);
+      return res.status(500).json({ success: false, message: 'Authorization service failure' });
     }
-
-    const userRole = (req.user.role || '').toLowerCase();
-    const adminRoles = [ROLES.SUPER_ADMIN, ROLES.ADMIN, ROLES.MODERATOR];
-
-    // 2. Normal students receive 404 Not Found to prevent route enumeration
-    if (!adminRoles.includes(userRole)) {
-      return res.status(404).json({
-        success: false,
-        message: 'Cannot ' + req.method + ' ' + req.originalUrl
-      });
-    }
-
-    // 3. Granular permission check
-    if (requiredPermission && !hasPermission(userRole, requiredPermission)) {
-      return res.status(403).json({
-        success: false,
-        message: `Forbidden: Lacks required permission '${requiredPermission}'.`
-      });
-    }
-
-    next();
   };
 }
 

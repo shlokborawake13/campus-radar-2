@@ -35,6 +35,8 @@ import {
 import { apiService } from '../services/api';
 
 export default function AdminView({ currentUser }) {
+  const isAuthorizedAdmin = ['admin', 'super_admin'].includes(currentUser?.role?.toLowerCase());
+
   // Navigation
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'users' | 'posts' | 'confessions' | 'comments' | 'events' | 'reports' | 'audit' | 'analytics' | 'security'
   const [timeRange, setTimeRange] = useState('7d');
@@ -305,8 +307,9 @@ export default function AdminView({ currentUser }) {
     }
   }, []);
 
-  // Dispatch fetcher according to active tab
+  // Dispatch fetcher according to active tab (Authorized Admin ONLY)
   useEffect(() => {
+    if (!isAuthorizedAdmin) return;
     setError(null);
     if (activeTab === 'dashboard') fetchDashboard();
     else if (activeTab === 'users') fetchUsers();
@@ -503,16 +506,27 @@ export default function AdminView({ currentUser }) {
     }
   };
 
-  // Access check
-  if (error && error.includes('404')) {
+  // Access check: If not an authorized admin, or if unauthorized error received, fail closed
+  if (!isAuthorizedAdmin || (error && (error.includes('403') || error.includes('401') || error.includes('404') || error.includes('Forbidden') || error.includes('Unauthorized') || error.includes('Cannot')))) {
     return (
-      <div className="flex flex-col pb-24 lg:pb-8 w-full max-w-5xl mx-auto">
-        <div className="text-center py-20 bg-white rounded-3xl border border-slate-border p-8 shadow-sm">
-          <AlertCircle className="w-14 h-14 text-rose-500 mx-auto mb-3" />
-          <h2 className="text-xl font-bold text-slate-headline mb-1">404 Not Found</h2>
-          <p className="text-sm text-slate-meta max-w-md mx-auto">
-            The requested resource cannot be found or you lack administrative authorization to view it.
+      <div className="flex flex-col items-center justify-center min-h-[60vh] w-full px-4 py-12">
+        <div className="text-center py-16 px-6 bg-white rounded-3xl border border-slate-border max-w-md w-full shadow-soft-card">
+          <div className="w-14 h-14 bg-slate-50 border border-slate-200/60 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-400">
+            <AlertCircle className="w-7 h-7 stroke-[1.75]" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-headline mb-2 tracking-tight">404</h1>
+          <h2 className="text-sm font-bold text-slate-headline mb-1">Page Not Found</h2>
+          <p className="text-xs text-slate-meta max-w-xs mx-auto mb-6 leading-relaxed">
+            The page you are looking for does not exist, has been removed, or is temporarily unavailable.
           </p>
+          <button
+            onClick={() => {
+              window.location.hash = '/radar';
+            }}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition duration-150 shadow-sm cursor-pointer"
+          >
+            <span>Return to Feed</span>
+          </button>
         </div>
       </div>
     );

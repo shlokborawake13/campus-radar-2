@@ -17,19 +17,30 @@ export default function TopNav({
       <div className="w-full max-w-[1440px] mx-auto flex items-center justify-between gap-4">
         {/* Left: Brand Wordmark & Sanjivani University indicator */}
         <div className="flex items-center gap-4 shrink-0">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[20px] font-bold tracking-tight text-slate-headline flex items-center gap-1 font-sans">
-                Campus <span className="text-secondary font-extrabold">Radar</span>
-                <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse ml-0.5" title="Live Campus Activity"></span>
-              </span>
+          <a
+            href="#/radar"
+            onClick={(e) => {
+              if (currentTab === 'feed') {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }}
+            className="flex items-center gap-2 group cursor-pointer focus:outline-none"
+            aria-label="Campus Radar Home"
+          >
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <span className="text-[18px] font-black tracking-tight text-slate-headline group-hover:text-primary transition-colors flex items-center">
+                  <span className="text-primary font-black">Campus</span>&nbsp;Radar
+                </span>
+                <span className="inline-block w-2 h-2 rounded-full bg-primary animate-pulse" title="Live Campus Activity"></span>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-medium text-slate-meta group-hover:text-slate-body cursor-pointer">
+                <MapPin className="w-3 h-3 text-primary" />
+                <span>Sanjivani University</span>
+                <span className="text-[9px] text-slate-meta">▼</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1 text-[11px] font-medium text-slate-meta hover:text-slate-body cursor-pointer">
-              <MapPin className="w-3 h-3 text-primary" />
-              <span>Sanjivani University</span>
-              <span className="text-[9px] text-slate-meta">▼</span>
-            </div>
-          </div>
+          </a>
         </div>
 
         {/* Center: Desktop/Tablet Search Bar */}

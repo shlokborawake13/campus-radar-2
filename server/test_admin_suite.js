@@ -79,15 +79,15 @@ async function runTestSuite() {
     assert.strictEqual(unauthRes.status, 401, 'Unauthenticated request must receive 401');
     console.log('✓ Unauthenticated access rejected with 401');
 
-    // 1B. Student request to /api/admin/overview -> MUST BE 404 (zero route enumeration)
+    // 1B. Student request to /api/admin/overview -> MUST BE 403 Forbidden
     const studentAdminRes = await api('/admin/overview', { token: studentToken });
-    assert.strictEqual(studentAdminRes.status, 404, 'Normal student accessing admin route MUST receive 404 Not Found');
-    console.log('✓ Normal student accessing /api/admin/overview received 404 Not Found (zero route enumeration)');
+    assert.strictEqual(studentAdminRes.status, 403, 'Normal student accessing admin route MUST receive 403 Forbidden');
+    console.log('✓ Normal student accessing /api/admin/overview received 403 Forbidden');
 
-    // 1C. Student request to /api/admin/users -> MUST BE 404
+    // 1C. Student request to /api/admin/users -> MUST BE 403 Forbidden
     const studentUsersRes = await api('/admin/users', { token: studentToken });
-    assert.strictEqual(studentUsersRes.status, 404, 'Normal student accessing /api/admin/users MUST receive 404');
-    console.log('✓ Normal student accessing /api/admin/users received 404 Not Found');
+    assert.strictEqual(studentUsersRes.status, 403, 'Normal student accessing /api/admin/users MUST receive 403 Forbidden');
+    console.log('✓ Normal student accessing /api/admin/users received 403 Forbidden');
 
     // 1D. Admin request to /api/admin/overview -> 200 OK
     const adminOverviewRes = await api('/admin/overview', { token: adminToken });

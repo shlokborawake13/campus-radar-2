@@ -178,13 +178,16 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,ht
   .split(',')
   .map(o => o.trim());
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS access blocked by Campus Radar security policy.'));
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (isDev && (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:'))) {
+      return callback(null, true);
     }
+    callback(new Error('CORS access blocked by Campus Radar security policy.'));
   },
   credentials: true
 }));
@@ -2056,6 +2059,11 @@ app.get('/api/settings', async (req, res) => {
 
 app.put('/api/settings', rateLimit({ max: 20 }), async (req, res) => {
   try {
+    // Strict Role Integrity Protection: Reject any attempt to modify role or status
+    if (req.body.role !== undefined || req.body.status !== undefined) {
+      return res.status(400).json({ success: false, message: 'Role or account status cannot be modified via profile settings.' });
+    }
+
     const {
       show_department,
       show_year,
